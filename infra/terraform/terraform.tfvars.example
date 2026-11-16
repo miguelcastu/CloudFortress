@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars locally, or use the TF_VAR_* exports in docs/phases.
+# Do not define the same setting in both places: tfvars overrides environment.
+project_id = "YOUR_PROJECT_ID"
+region     = "europe-west1"
+zone       = "europe-west1-b"
+lab_phase  = 1
+
+# Required only for phase 2:
+# operator_member = "user:YOUR_EMAIL"
+
+# Reversible negative-test controls (restore after each test):
+phase2_iap_ssh_enabled = true
+phase3_http_enabled   = true
+phase4_allow_read     = true
+bucket_name_suffix    = "lab"

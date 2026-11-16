@@ -1,6 +1,46 @@
 # CloudFortress
 
-Infraestructura de laboratorio en Google Cloud gestionada con Terraform.
+Laboratorio de arquitectura de seguridad en Google Cloud gestionado con Terraform: acceso administrativo privado, comunicación entre aplicaciones y autorización de recursos.
+
+| Fase | Qué construye | Qué demuestra |
+| --- | --- | --- |
+| 1: base | VPC, subred privada, identidad y servicio Cloud Run autenticado | Infraestructura inicial |
+| 2: acceso seguro | VM Debian sin IP pública, IAP, OS Login y firewall SSH | Conexión permitida, bloqueada y restaurada |
+| 3: conectividad privada | Job con Direct VPC egress y VM HTTP privada | HTTP 200 y bloqueo entre subredes |
+| 4: mínimo privilegio | Dos buckets privados e identidad de aplicación | Lectura 200/403, retirada y restauración del rol |
+
+## Ejecutar el laboratorio
+
+Los comandos de Google Cloud se ejecutan en Cloud Shell. Empieza por la [comprobación de instalación](docs/getting-started.md) y sigue las [instrucciones comunes de las fases](docs/phases/README.md), que incluyen despliegue, captura de logs, evidencias y destrucción.
+
+- [Fase 2: acceso seguro](docs/phases/phase2.md).
+- [Fase 3: conectividad privada](docs/phases/phase3.md).
+- [Fase 4: IAM y mínimo privilegio](docs/phases/phase4.md).
+- [Arquitectura y diagramas](docs/architecture/README.md).
+- [Plantilla de evidencias](docs/evidence/README.md).
+
+**Nunca ejecutes `terraform apply` sin revisar antes el plan.** El repositorio no despliega recursos ni ejecuta pruebas en Google Cloud automáticamente. Los resultados esperados están separados de las evidencias que registres al ejecutar el laboratorio.
+
+## Requisitos y variables
+
+Terraform >= 1.7.0, Google Cloud CLI, un proyecto con facturación y permisos de despliegue adecuados. La guía común explica las APIs y las identidades. En Cloud Shell se utiliza la autenticación de la sesión; para Terraform en un equipo local, configura Application Default Credentials.
+
+| Variable | Valor por defecto | Uso |
+| --- | --- | --- |
+| `project_id` | Obligatoria | ID del proyecto del laboratorio |
+| `lab_phase` | `1` | Activa una fase a la vez: 1, 2, 3 o 4 |
+| `region` | `europe-west1` | Región de los recursos |
+| `zone` | Región + `-b` | Zona de las VMs, dentro de la región |
+| `operator_member` | `null` | Obligatoria en fase 2: `user:EMAIL` o `group:EMAIL` |
+| `phase2_iap_ssh_enabled` | `true` | Control reversible de SSH |
+| `phase3_http_enabled` | `true` | Control reversible del firewall HTTP |
+| `phase4_allow_read` | `true` | Control reversible del permiso de lectura |
+| `bucket_name_suffix` | `lab` | Resuelve conflictos globales de nombres de buckets |
+| `vm_machine_type` | `e2-micro` | Tipo de VM de laboratorio |
+| `debian_image` | `debian-cloud/debian-12` | Imagen; fase 3 requiere Python 3 preinstalado |
+| `python_container_image` | `docker.io/library/python:3.12-slim` | Runtime de los Jobs; permite fijar un digest |
+
+No necesitas escribir IDs en el código: proporciona el proyecto y el operador como variables siguiendo las guías. Cambiar de fase puede eliminar sus recursos; completa las pruebas y la limpieza antes de pasar a la siguiente.
 
 ## Estructura
 
@@ -10,73 +50,49 @@ CloudFortress/
 ├── README.md
 ├── LICENSE
 ├── .gitignore
+├── .gitattributes
 ├── docs/
 │   ├── getting-started.md
-│   └── architecture/
-│       └── README.md
-└── infra/
-    └── terraform/
-        ├── .terraform.lock.hcl
-        ├── main.tf
-        ├── variables.tf
-        └── outputs.tf
+│   ├── architecture/README.md
+│   ├── evidence/README.md
+│   └── phases/
+│       ├── README.md
+│       ├── phase2.md
+│       ├── phase3.md
+│       └── phase4.md
+├── infra/terraform/
+│   ├── .terraform.lock.hcl
+│   ├── main.tf
+│   ├── variables.tf
+│   ├── outputs.tf
+│   ├── terraform.tfvars.example
+│   ├── network_lab.tf
+│   ├── phase3_private_connectivity.tf
+│   ├── phase4_iam.tf
+│   ├── scripts/
+│   ├── templates/
+│   └── tests/security.tftest.hcl
+└── tests/test_probes.py
 ```
 
-## Recursos
+## Estado, costes y limpieza
 
-- VPC personalizada `cloudfortress-vpc`.
-- Subred `cloudfortress-subnet` con rango `10.10.10.0/24` y Private Google Access.
-- Cuenta de servicio `cloudfortress-app` para la aplicación.
-- Servicio Cloud Run `cloudfortress-hello` con una imagen de ejemplo, autenticación IAM y escalado entre cero y una instancia.
+El estado de Terraform se guarda localmente. Consérvalo durante todo el laboratorio y configura un backend remoto antes de trabajar en equipo. `.gitignore` excluye estados, planes, variables locales, credenciales, cachés y evidencias originales. Versiona `.terraform.lock.hcl`.
 
-El servicio permite tráfico de entrada desde Internet, pero no concede invocación anónima. La configuración actual no conecta Cloud Run a la VPC. Consulta [la arquitectura](docs/architecture/README.md) para más detalles.
+Las VMs y discos, los Jobs, el almacenamiento y los logs pueden generar costes. El servicio Cloud Run original escala a cero cuando no se usa. La [limpieza común](docs/phases/README.md#evidencias-github-y-limpieza) utiliza un plan de destrucción revisado, elimina los recursos del laboratorio y conserva las APIs habilitadas. Los buckets contienen solo objetos de prueba; no se fuerzan borrados de datos inesperados.
 
-## Requisitos
+## Comprobar el código sin desplegar
 
-- Terraform >= 1.7.0.
-- Google Cloud CLI y credenciales con permisos para crear los recursos definidos.
-- Un proyecto de Google Cloud con facturación y las APIs de Compute Engine, Cloud Run e IAM habilitadas.
-
-## Uso
-
-Sigue la [guía de preparación en Google Cloud Shell](docs/getting-started.md) para comprobar la instalación, actualizar Bash si es necesario, configurar el proyecto y resolver alias o funciones que intercepten Terraform. En Cloud Shell no hace falta crear credenciales locales; en un equipo local, autentica Application Default Credentials:
-
-```sh
-gcloud auth application-default login
-```
-
-Con el proyecto de Google Cloud ya configurado, desde la raíz del repositorio y en Bash:
+Con las dependencias de Terraform inicializadas:
 
 ```bash
-export TF_VAR_project_id="$(gcloud config get-value project)"
-printf 'Proyecto para Terraform: %s\n' "$TF_VAR_project_id"
-cd infra/terraform
-terraform init
-terraform fmt -check
-terraform validate
-terraform plan -out=tfplan
-terraform show -no-color tfplan
+terraform -chdir=infra/terraform fmt -check -recursive
+terraform -chdir=infra/terraform validate
+terraform -chdir=infra/terraform test
+python3 -m unittest discover -s tests -v
 ```
 
-Ejecuta los comandos en orden y detente si alguno falla. Comprueba que `TF_VAR_project_id` contenga el ID correcto antes de generar el plan. Si necesitas evitar un alias o función en Linux, utiliza `/usr/bin/terraform` cuando esa sea la ruta del binario instalado.
-
-**Nunca ejecutes `terraform apply` sin revisar primero el plan.** Revisa permisos IAM, exposición a Internet, recursos propuestos y posibles costes. Esta fase termina con el plan y no despliega recursos.
-
-`project_id` es obligatorio. `region` utiliza `europe-west1` por defecto y se puede cambiar añadiendo `-var="region=TU_REGION"` al comando `terraform plan`.
-
-Las salidas incluyen los nombres de la VPC y la subred, la URL de Cloud Run y la cuenta de servicio de la aplicación. El despliegue puede generar costes en Google Cloud.
-
-Para eliminar los recursos creados:
-
-```sh
-terraform destroy -var="project_id=TU_PROJECT_ID"
-```
-
-Si cambiaste la región, utiliza también ese mismo valor al eliminar los recursos.
-
-## Estado y credenciales
-
-El estado de Terraform se guarda localmente; configura un backend remoto antes de trabajar en equipo. `.gitignore` excluye estados, planes, archivos de variables y credenciales locales. El archivo `.terraform.lock.hcl` debe versionarse cuando se genere con `terraform init`.
+Los tests de Terraform simulan el proveedor y solo calculan planes; las pruebas Python usan un servidor local y respuestas simuladas. Las pruebas reales se realizan por separado en Cloud Shell.
 
 ## Licencia
 

@@ -1,0 +1,33 @@
+#!/bin/bash
+set -euo pipefail
+
+# No apt/pip downloads: the private VM has no public IP or Cloud NAT.
+test -x /usr/bin/python3 || { echo 'ERROR: image must include /usr/bin/python3' >&2; exit 1; }
+install -d -m 0755 /opt/cloudfortress
+printf '%s' '${server_base64}' | base64 --decode > /opt/cloudfortress/health_server.py
+chmod 0644 /opt/cloudfortress/health_server.py
+
+cat > /etc/systemd/system/cloudfortress-health.service <<'UNIT'
+[Unit]
+Description=CloudFortress private health endpoint
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u /opt/cloudfortress/health_server.py
+DynamicUser=yes
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable cloudfortress-health.service
+systemctl restart cloudfortress-health.service

@@ -1,6 +1,6 @@
 # Preparación de Terraform en Google Cloud Shell
 
-Ejecuta estos pasos en la terminal Bash de Google Cloud Shell. Esta fase comprueba la instalación, inicializa el directorio y genera un plan para revisarlo. No despliega recursos.
+Ejecuta estos pasos en la terminal Bash de Google Cloud Shell. Esta fase comprueba la instalación, inicializa el directorio y genera un plan para revisarlo. No despliega recursos. Para los laboratorios 2, 3 y 4, continúa después con [la guía de fases](phases/README.md).
 
 ## 1. Comprobar la instalación
 

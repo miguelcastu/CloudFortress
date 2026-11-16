@@ -14,10 +14,36 @@ provider "google" {
   region  = var.region
 }
 
+locals {
+  phase2 = var.lab_phase == 2
+  phase3 = var.lab_phase == 3
+  phase4 = var.lab_phase == 4
+  zone   = coalesce(var.zone, "${var.region}-b")
+}
+
+# API activation is retained on destroy so other workloads are not disrupted.
+resource "google_project_service" "apis" {
+  for_each = toset([
+    "compute.googleapis.com",
+    "iam.googleapis.com",
+    "iap.googleapis.com",
+    "logging.googleapis.com",
+    "oslogin.googleapis.com",
+    "run.googleapis.com",
+    "storage.googleapis.com",
+  ])
+
+  project            = var.project_id
+  service            = each.value
+  disable_on_destroy = false
+}
+
 # 1. Custom VPC
 resource "google_compute_network" "lab" {
   name                    = "cloudfortress-vpc"
   auto_create_subnetworks = false
+
+  depends_on = [google_project_service.apis]
 }
 
 # 2. Private subnet
@@ -33,9 +59,11 @@ resource "google_compute_subnetwork" "private" {
 resource "google_service_account" "app" {
   account_id   = "cloudfortress-app"
   display_name = "CloudFortress Runtime Identity"
+
+  depends_on = [google_project_service.apis]
 }
 
-# 4. Private Cloud Run application
+# 4. Authenticated Cloud Run application (Internet ingress is allowed)
 resource "google_cloud_run_v2_service" "app" {
   name                = "cloudfortress-hello"
   location            = var.region
@@ -56,4 +84,6 @@ resource "google_cloud_run_v2_service" "app" {
       image = "us-docker.pkg.dev/cloudrun/container/hello"
     }
   }
+
+  depends_on = [google_project_service.apis]
 }

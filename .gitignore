@@ -40,3 +40,10 @@ service-account*.json
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Python local caches
+__pycache__/
+*.py[cod]
+
+# Raw lab evidence may include account/project details; publish reviewed summaries.
+docs/evidence/raw/
