@@ -6,10 +6,12 @@ Infraestructura de laboratorio en Google Cloud gestionada con Terraform.
 
 ```text
 CloudFortress/
+├── AGENTS.md
 ├── README.md
 ├── LICENSE
 ├── .gitignore
 ├── docs/
+│   ├── getting-started.md
 │   └── architecture/
 │       └── README.md
 └── infra/
@@ -37,22 +39,28 @@ El servicio permite tráfico de entrada desde Internet, pero no concede invocaci
 
 ## Uso
 
-Autentica las credenciales locales de la aplicación:
+Sigue la [guía de preparación en Google Cloud Shell](docs/getting-started.md) para comprobar la instalación, actualizar Bash si es necesario, configurar el proyecto y resolver alias o funciones que intercepten Terraform. En Cloud Shell no hace falta crear credenciales locales; en un equipo local, autentica Application Default Credentials:
 
 ```sh
 gcloud auth application-default login
 ```
 
-Desde la raíz del repositorio:
+Con el proyecto de Google Cloud ya configurado, desde la raíz del repositorio y en Bash:
 
-```sh
+```bash
+export TF_VAR_project_id="$(gcloud config get-value project)"
+printf 'Proyecto para Terraform: %s\n' "$TF_VAR_project_id"
 cd infra/terraform
 terraform init
 terraform fmt -check
 terraform validate
-terraform plan -var="project_id=TU_PROJECT_ID" -out=tfplan
-terraform apply tfplan
+terraform plan -out=tfplan
+terraform show -no-color tfplan
 ```
+
+Ejecuta los comandos en orden y detente si alguno falla. Comprueba que `TF_VAR_project_id` contenga el ID correcto antes de generar el plan. Si necesitas evitar un alias o función en Linux, utiliza `/usr/bin/terraform` cuando esa sea la ruta del binario instalado.
+
+**Nunca ejecutes `terraform apply` sin revisar primero el plan.** Revisa permisos IAM, exposición a Internet, recursos propuestos y posibles costes. Esta fase termina con el plan y no despliega recursos.
 
 `project_id` es obligatorio. `region` utiliza `europe-west1` por defecto y se puede cambiar añadiendo `-var="region=TU_REGION"` al comando `terraform plan`.
 
